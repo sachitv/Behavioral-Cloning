@@ -47,20 +47,22 @@ def CreateModel():
 
 
 
-def training_generator(samples, num_images_at_once=32, training_batch_size=256, num_augmentations = 8):
+def training_generator(samples, num_images_at_once=32, num_augmentations = 8):
     num_samples = len(samples)
     while 1: # Loop forever so the generator never terminates
         shuffle(samples)
         for offset in range(0, num_samples, num_images_at_once):
             batch_samples = samples[offset:offset+num_images_at_once]
             
-            images = np.empty((training_batch_size, 66, 200, 3))
-            angles = np.empty((training_batch_size))
+            images_per_generation = num_images_at_once * num_augmentations * 3 # 3 because of left, right, center
             
+            images = np.empty((images_per_generation, 66, 200, 3))
+            angles = np.empty((images_per_generation))
+                        
             start = 0
-            
+                        
             for batch_sample in batch_samples:
-            	end = start+num_augmentations
+            	end = start + num_augmentations
             	
             	#center image
             	name = 'training_data/IMG/'+batch_sample[0].split('/')[-1]
@@ -83,9 +85,9 @@ def training_generator(samples, num_images_at_once=32, training_batch_size=256, 
             	#right image
             	name = 'training_data/IMG/'+batch_sample[2].split('/')[-1]
             	right_image = cv2.imread(name)
-            	right_angle = float(batch_sample[3]) - 0.25
+            	right_angle = float(batch_sample[3]) - 0.25            	
             	images[start:end,:,:,:], angles[start:end] = PreprocessImageTrain(right_image, num_augmentations, right_angle)
-            	
+            	            	
             	start = end
             
             # trim image to only see section with road
@@ -134,14 +136,14 @@ def main():
     numEpochs = 10
     numAugmentations = 8
     
-    num_images_at_once = 1
-    training_batch_size = num_images_at_once * numAugmentations * 3  # for 3 images- left, right, center.
+    num_images_at_once = 5
+    training_batch_size = len(train_samples) * numAugmentations * 3  # for 3 images- left, right, center.
     validation_batch_size = 8
-    training_samples_per_epoch = len(train_samples) * training_batch_size
+    training_samples_per_epoch = training_batch_size
     
     
     # compile and train the model using the generator function
-    train_generator = training_generator(train_samples, num_images_at_once=num_images_at_once, training_batch_size=training_batch_size, num_augmentations=numAugmentations)
+    train_generator = training_generator(train_samples, num_images_at_once=num_images_at_once, num_augmentations=numAugmentations)
     val_generator = validation_generator(validation_samples, batch_size=validation_batch_size)
     
     model = CreateModel();
