@@ -15,7 +15,7 @@ from io import BytesIO
 from keras.models import load_model
 
 import cv2
-from common import PreprocessImage
+from common import PreprocessImageTest
 
 sio = socketio.Server()
 app = Flask(__name__)
@@ -36,7 +36,7 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         cv2image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        cv2image = PreprocessImage(cv2image)
+        cv2image = PreprocessImageTest(cv2image)
         image_array = np.asarray(cv2image)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
         throttle = 0.05
