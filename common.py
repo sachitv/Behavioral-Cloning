@@ -2,71 +2,72 @@ import cv2
 import numpy as np
 import math
 
-def WhiteOutSides(img):
-	whitened = img
+def alterBrightness(img):
+	img = ConvertToHSV(img)
+	random_bright = .25+np.random.uniform()
+	img[:,:,2] = img[:,:,2]*random_bright
+	return img
 	
-	width = whitened.shape[1]
-	height = whitened.shape[0]
-	halfwidth = int(width/2)
-	
-	for i in range(height):
-		for j in range(halfwidth,width):
-			if(img[i][j] == 255):
-				img[i:i+1, j:width] = 255
-				break
-		for j in range(0,halfwidth):
-			iter = halfwidth - j
-			if(img[i][iter] == 255):
-				img[i:i+1, 0:iter] = 255
-				break				
-	return whitened
+def trans_image(image,steer):
+    # Translation
+    trans_range_x = 40
+    trans_range_y = 10
+    rows,cols,channels = image.shape
+    
+    tr_x = trans_range_x*np.random.uniform()-trans_range_x/2
+    steer_ang = steer + tr_x/trans_range_x*2*0.2
+    
+    tr_y = trans_range_y*np.random.uniform()-trans_range_y/2
+    Trans_M = np.float32([[1,0,tr_x],[0,1,tr_y]])
+    image_tr = cv2.warpAffine(image,Trans_M,(cols,rows), borderMode=cv2.BORDER_REPLICATE)
+    
+    return image_tr,steer_ang
 
-def DrawLines(img, lines, color=[255, 255, 255], thickness=2):
-	for line in lines:
-	    for x1,y1,x2,y2 in line:
-	        cv2.line(img, (x1,y1), (x2,y2), color, thickness)
-
-
-def PreprocessImage(img):
+def CropResizeImage(img):
 	cropped = img[55:136, 0:320] # Crop from x, y, w, h -> 0, 55, 320, 136
-	resized_image = cv2.resize(cropped, (200, 66))
-	hsv = cv2.cvtColor(resized_image,cv2.COLOR_BGR2HSV)
+	resized = cv2.resize(cropped, (200, 66))
+	return resized
+
+def ConvertToHSV(img):
+	hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
+	return hsv
 	
-	#Enhance Lines and Hide other features
-	rho = 1; #pixel
-	theta = math.pi / 180;
-	threshold = 20;
-	min_line_len = 12;
-	max_line_gap = 10;
+def PreprocessImageTrain(img, combinations_per_augmentation, inputsteer = 0):
+	#Generate combination Images
+	combinations = []
+	steeringAngles = []
 	
-	kernel_size = 5
+	#add the original separately
+	combinations.append( CropResizeImage( ConvertToHSV(img ) ) )
+	steeringAngles.append(inputsteer)
 	
-	gaussian = cv2.GaussianBlur(hsv, (kernel_size, kernel_size), 0)	
+	#make some augmentations
+	for i in range(combinations_per_augmentation - 1):
+		newImage = alterBrightness(img)
+		newImage = CropResizeImage(newImage)
+		newImage, newSteer = trans_image(newImage, inputsteer)
+		combinations.append(newImage)
+		steeringAngles.append(newSteer)
 	
-	#use the saturation value
-	grayscaleImage = cv2.split(hsv)[1]
-	cannyImg = cv2.Canny(grayscaleImage, 50, 150)
+	combinations = np.array(combinations)
+	steeringAngles = np.array(steeringAngles)
 	
-	lines = cv2.HoughLinesP(cannyImg, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
+	return combinations, steeringAngles
+	
+def PreprocessImageTest(img):
+	resized = CropResizeImage(img)
+	hsv = ConvertToHSV(resized)
+	return hsv
+	
+def test():
+	image = cv2.imread("training_data/IMG/center_2017_02_12_08_24_32_131.jpg")
+	
+	images = np.empty((10, 66, 200, 3))
+	steering = np.empty((10))
+		
+	images[0:10,:,:,:], steering[0:10] = PreprocessImageTrain(image, 10, 5.0)
 			
-	mask3Channel = np.zeros_like(gaussian)
-	DrawLines(mask3Channel, lines)
-	mask = cv2.cvtColor(mask3Channel,cv2.COLOR_RGB2GRAY)
-	#mask = WhiteOutSides(mask)
-    #cv2.imwrite('mask.jpg', mask)
+	for i in range(len(images)):
+		cv2.imwrite("temp" + str(i) + "-steer:"+str(steering[i])+".jpg", images[i])
 	
-	invertedMask = cv2.bitwise_not(mask)
-	
-	maskedImage = cv2.bitwise_and(gaussian,gaussian,mask = invertedMask)
-	
-	weightedImage = cv2.addWeighted(gaussian, 0.5, maskedImage, 0.5, 0)
-	
-	return weightedImage
-	
-def main():
-	image = cv2.imread("output/2017_02_13_03_50_27_850.jpg")
-	#image = cv2.imread("workingtraining_data/IMG/center_2017_02_12_08_24_51_858.jpg")
-	image = PreprocessImage(image)	
-	cv2.imwrite('temp.jpg', image)
-	
-#main()
+test()
