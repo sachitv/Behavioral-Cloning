@@ -70,4 +70,4 @@ def test():
 	for i in range(len(images)):
 		cv2.imwrite("temp" + str(i) + "-steer:"+str(steering[i])+".jpg", images[i])
 	
-test()
+#test()
